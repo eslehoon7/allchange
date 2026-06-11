@@ -47,4 +47,5 @@ export interface AdData {
   cta: string;
   imageUrl?: string;
   accentColor: string;
+  company?: string;
 }

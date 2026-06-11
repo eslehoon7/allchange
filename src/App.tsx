@@ -15,7 +15,8 @@ import {
   Lock,
   ChevronDown,
   MonitorCheck,
-  CheckCircle2
+  CheckCircle2,
+  ArrowLeftRight
 } from 'lucide-react';
 import { FileData, FileFormat, ConversionSettings as SettingsType, LogEntry } from './types';
 import FileUploader from './components/FileUploader';
@@ -52,6 +53,13 @@ export default function App() {
   const [convertedBlob, setConvertedBlob] = useState<Blob | null>(null);
   const [convertedFileName, setConvertedFileName] = useState('');
   const [previewUrl, setPreviewUrl] = useState('');
+  const [conversionCount, setConversionCount] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('allchange_conversion_count');
+      return saved ? parseInt(saved, 10) : 1;
+    }
+    return 1;
+  });
 
   const [activeFAQ, setActiveFAQ] = useState<number | null>(null);
 
@@ -130,13 +138,19 @@ export default function App() {
         selectedFile.name,
         targetFormat,
         selectedFile.dataUrl,
-        selectedFile.rawContent
+        selectedFile.rawContent,
+        conversionCount
       );
 
       setConvertedBlob(result.blob);
       setConvertedFileName(result.fileName);
       setPreviewUrl(result.previewUrl);
       setStep('completed');
+
+      // Increment and persist the file counter for high uniqueness on local filesystem downloads
+      const nextCount = conversionCount + 1;
+      setConversionCount(nextCount);
+      localStorage.setItem('allchange_conversion_count', String(nextCount));
     } catch (e) {
       addLog('변환 스트림 생성 도중 예상치 못한 오류가 생겼습니다.', 'error');
       setStep('upload');
@@ -156,8 +170,8 @@ export default function App() {
       <header className="bg-white border-b border-slate-200/80 sticky top-0 z-40 shadow-xs backdrop-blur-md bg-white/95">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-extrabold shadow-md shadow-blue-500/20 select-none">
-              <Zap size={20} className="fill-white" />
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/25 select-none transition-transform hover:scale-105 duration-300">
+              <ArrowLeftRight size={18} className="stroke-[2.5]" />
             </div>
             <div className="flex flex-col">
               <h1 id="brand-title" className="text-xl font-black text-slate-900 tracking-tight leading-none">
@@ -170,12 +184,12 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="hidden md:flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 font-bold py-1 px-2.5 rounded-full">
+            <span className="hidden md:flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50/80 font-bold py-1.5 px-3 rounded-lg select-none border border-emerald-100">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
               서버 가동률 99.9%
             </span>
             <div className="flex items-center gap-2.5">
-              <span className="text-xs font-semibold text-slate-500 hover:text-slate-950 transition-all ml-1 bg-slate-100 py-1.5 px-3 rounded-lg select-none flex items-center gap-1 text-[11px]">
+              <span className="text-[11px] font-semibold text-slate-600 transition-all ml-1 bg-slate-50 py-1.5 px-3 rounded-lg select-none flex items-center gap-1 border border-slate-200/85">
                 <Lock size={12} className="text-slate-400" />
                 SSL 암호화 연결
               </span>

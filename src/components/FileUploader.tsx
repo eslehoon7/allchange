@@ -27,7 +27,21 @@ const SUPPORTED_EXTENSIONS: FileFormat[] = [
 export default function FileUploader({ onFileLoaded, selectedFile, onClear }: FileUploaderProps) {
   const [isDragActive, setIsDragActive] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [selectedSourceExt, setSelectedSourceExt] = useState<FileFormat | 'all'>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const getAcceptString = () => {
+    if (selectedSourceExt === 'all') {
+      return '.pdf,.jpg,.jpeg,.png,.hwp,.docx,.pptx,.txt,.dwg,.xlsx,.ai,.psd';
+    }
+    if (selectedSourceExt === 'jpg') {
+      return '.jpg,.jpeg';
+    }
+    if (selectedSourceExt === 'png') {
+      return '.png';
+    }
+    return `.${selectedSourceExt}`;
+  };
 
   const processFile = (file: File) => {
     setErrorMsg(null);
@@ -49,17 +63,24 @@ export default function FileUploader({ onFileLoaded, selectedFile, onClear }: Fi
 
     if (ext === 'txt') {
       reader.onload = (e) => {
-        onFileLoaded({
-          id: `${Date.now()}-${file.name}`,
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          extension: ext,
-          rawContent: e.target?.result as string,
-        });
+        const textResult = e.target?.result as string;
+        const dataUrlReader = new FileReader();
+        dataUrlReader.onload = (de) => {
+          onFileLoaded({
+            id: `${Date.now()}-${file.name}`,
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            extension: ext,
+            rawContent: textResult,
+            dataUrl: de.target?.result as string,
+          });
+        };
+        dataUrlReader.readAsDataURL(file);
       };
       reader.readAsText(file);
-    } else if (['jpg', 'jpeg', 'png'].includes(ext)) {
+    } else {
+      // For all binary formats (pdf, dwg, psd, ai, docx, pptx, xlsx, hwp, png, jpg, jpeg)
       reader.onload = (e) => {
         onFileLoaded({
           id: `${Date.now()}-${file.name}`,
@@ -68,20 +89,10 @@ export default function FileUploader({ onFileLoaded, selectedFile, onClear }: Fi
           type: file.type,
           extension: ext,
           dataUrl: e.target?.result as string,
+          rawContent: `Binary content of ${ext.toUpperCase()}`,
         });
       };
       reader.readAsDataURL(file);
-    } else {
-      // For general binary formats (dwg, psd, ai, pdf, docx, pptx, xlsx, hwp)
-      // We read as ArrayBuffer or trigger successfully
-      onFileLoaded({
-        id: `${Date.now()}-${file.name}`,
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        extension: ext,
-        rawContent: `Binary format ${ext.toUpperCase()}`,
-      });
     }
   };
 
@@ -156,7 +167,7 @@ export default function FileUploader({ onFileLoaded, selectedFile, onClear }: Fi
           type="file"
           className="hidden"
           onChange={handleChange}
-          accept=".pdf,.jpg,.jpeg,.png,.hwp,.docx,.pptx,.txt,.dwg,.xlsx,.ai,.psd"
+          accept={getAcceptString()}
         />
 
         {selectedFile ? (
@@ -198,15 +209,103 @@ export default function FileUploader({ onFileLoaded, selectedFile, onClear }: Fi
 
             <div className="flex flex-col gap-1">
               <p className="text-slate-800 font-bold text-sm">
-                {isDragActive ? '여기에 마우스를 놓고 마우스 버튼을 떼서 즉시 업로드하세요!' : '여기에 파일을 드래그하여 놓거나 클릭하여 선택하세요'}
+                {isDragActive 
+                  ? '여기에 마우스를 놓고 마우스 버튼을 떼서 즉시 업로드하세요!' 
+                  : selectedSourceExt !== 'all' 
+                    ? `.${selectedSourceExt.toUpperCase()} 형식의 파일을 선택하거나 끌어다 놓으세요`
+                    : '여기에 파일을 드래그하여 놓거나 클릭하여 선택하세요'}
               </p>
-              <p className="text-xs text-slate-400">
-                PDF, JPG, PNG, HWP, DOCX, PPTX, TXT, DWG, XLSX, AI, PSD 지원
-              </p>
+              {selectedSourceExt !== 'all' ? (
+                <div className="flex flex-col items-center gap-1.5 mt-1">
+                  <span className="text-xs text-blue-600 font-bold bg-blue-50/80 px-3 py-1 rounded-full border border-blue-100 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                    현재 지정 모드: .{selectedSourceExt.toUpperCase()} 파일
+                  </span>
+                  <button 
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedSourceExt('all');
+                    }}
+                    className="text-[10px] text-slate-400 hover:text-slate-600 underline cursor-pointer"
+                  >
+                    전체 지원 확장자 허용 상태로 복구
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 mb-2">
+                  PDF, JPG, PNG, HWP, DOCX, PPTX, TXT, DWG, XLSX, AI, PSD 지원
+                </p>
+              )}
             </div>
+
+            {!isDragActive && (
+              <button
+                type="button"
+                className="mt-1 py-2.5 px-5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-blue-500/10 cursor-pointer flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerFileInput();
+                }}
+              >
+                <Upload size={13} />
+                내 컴퓨터에서 파일 선택하기
+              </button>
+            )}
           </div>
         )}
       </div>
+
+      {/* 변환해야할 파일 확장자 선택란 */}
+      {!selectedFile && (
+        <div className="flex flex-col gap-3 p-4.5 bg-slate-50/60 rounded-2xl border border-slate-200/60 text-left">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <span className="flex h-2 w-2">
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
+              </span>
+              변환해야할 파일 확장자 선택
+            </span>
+            <span className="text-[10px] text-slate-400">원하는 확장자를 클릭하면 해당 파일만 찾아서 업로드할 수 있도록 필터링됩니다</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
+            {[
+              { ext: 'hwp', label: 'HWP 한글문서', color: 'hover:border-sky-300 hover:bg-sky-50/20' },
+              { ext: 'dwg', label: 'DWG 도면', color: 'hover:border-violet-300 hover:bg-violet-50/20' },
+              { ext: 'psd', label: 'PSD 포토샵', color: 'hover:border-blue-300 hover:bg-blue-50/20' },
+              { ext: 'ai', label: 'AI 일러스트', color: 'hover:border-amber-300 hover:bg-amber-50/20' },
+              { ext: 'pdf', label: 'PDF 문서', color: 'hover:border-rose-300 hover:bg-rose-50/20' },
+              { ext: 'xlsx', label: 'XLSX 엑셀', color: 'hover:border-green-300 hover:bg-green-50/20' },
+              { ext: 'docx', label: 'DOCX 워드', color: 'hover:border-indigo-300 hover:bg-indigo-50/20' },
+              { ext: 'pptx', label: 'PPTX 파워포인트', color: 'hover:border-orange-300 hover:bg-orange-50/20' },
+              { ext: 'jpg', label: 'JPG 이미지', color: 'hover:border-emerald-300 hover:bg-emerald-50/20' },
+              { ext: 'png', label: 'PNG 이미지', color: 'hover:border-teal-300 hover:bg-teal-50/20' },
+              { ext: 'txt', label: 'TXT 텍스트', color: 'hover:border-slate-300 hover:bg-slate-50/20' },
+            ].map((item) => {
+              const isSelected = selectedSourceExt === item.ext;
+              return (
+                <button
+                  key={item.ext}
+                  type="button"
+                  onClick={() => {
+                    setSelectedSourceExt(item.ext as FileFormat | 'all');
+                  }}
+                  className={`flex items-center justify-center py-2 px-2 border rounded-xl text-center transition-all cursor-pointer text-[11px] font-bold ${
+                    isSelected
+                      ? 'border-blue-600 bg-blue-50/50 text-blue-600 ring-1 ring-blue-500 shadow-sm'
+                      : `border-slate-200 bg-white text-slate-700 ${item.color}`
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+
+
+        </div>
+      )}
 
       {errorMsg && (
         <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl p-4 flex items-start gap-2.5 text-xs">
