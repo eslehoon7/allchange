@@ -61,6 +61,281 @@ export function formatBytes(bytes: number, decimals = 2) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
+// Generate beautiful, high-fidelity mock vector rendering using canvas
+export function generateCadMockup(originalFileName: string, type: 'dwg' | 'ai' | 'psd'): string {
+  if (typeof document === 'undefined') return '';
+  const canvas = document.createElement('canvas');
+  canvas.width = 1200;
+  canvas.height = 842; // standard landscape aspect ratio
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+
+  const baseName = originalFileName.substring(0, originalFileName.lastIndexOf('.')) || originalFileName;
+
+  if (type === 'dwg') {
+    // Elegant Dark Slate AutoCAD design
+    ctx.fillStyle = '#0b0f19';
+    ctx.fillRect(0, 0, 1200, 842);
+
+    // Grid lines block in cyan
+    ctx.strokeStyle = 'rgba(6, 182, 212, 0.15)';
+    ctx.lineWidth = 0.5;
+    for (let x = 0; x < 1200; x += 30) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, 842);
+      ctx.stroke();
+    }
+    for (let y = 0; y < 842; y += 30) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(1200, y);
+      ctx.stroke();
+    }
+
+    // Concentric CAD circles
+    ctx.strokeStyle = 'rgba(34, 211, 238, 0.8)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(600, 400, 160, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(600, 400, 80, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(34, 211, 238, 0.4)';
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.arc(600, 400, 240, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Structural building layout outlines (Double line exterior walls)
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 2.5;
+    // Outer wall
+    ctx.strokeRect(200, 150, 800, 500);
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 1;
+    // Inner offset wall
+    ctx.strokeRect(208, 158, 784, 484);
+
+    // Layout partition lines
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(480, 158);
+    ctx.lineTo(480, 642);
+    ctx.moveTo(780, 158);
+    ctx.lineTo(780, 642);
+    ctx.moveTo(208, 380);
+    ctx.lineTo(1000, 380);
+    ctx.stroke();
+
+    // Door swing indicators standard in CAD
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    // Door 1
+    ctx.arc(480, 380, 40, Math.PI, Math.PI * 1.5);
+    ctx.lineTo(480, 380);
+    // Door 2
+    ctx.arc(780, 380, 40, 0, Math.PI * 0.5);
+    ctx.lineTo(780, 380);
+    ctx.stroke();
+
+    // Dimension indicators in green
+    ctx.strokeStyle = '#10b981';
+    ctx.fillStyle = '#10b981';
+    ctx.lineWidth = 1;
+    ctx.font = 'bold 12px monospace';
+
+    // Length dimension marker
+    ctx.beginPath();
+    ctx.moveTo(200, 110);
+    ctx.lineTo(1000, 110);
+    ctx.moveTo(200, 100); ctx.lineTo(200, 120);
+    ctx.moveTo(1000, 100); ctx.lineTo(1000, 120);
+    ctx.stroke();
+    ctx.fillText('W_LENGTH = 18,450.00 mm', 520, 100);
+
+    // Height dimension marker
+    ctx.beginPath();
+    ctx.moveTo(140, 150);
+    ctx.lineTo(140, 650);
+    ctx.moveTo(130, 150); ctx.lineTo(150, 150);
+    ctx.moveTo(130, 650); ctx.lineTo(150, 650);
+    ctx.stroke();
+    ctx.save();
+    ctx.translate(125, 410);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText('H_HEIGHT = 11,200.00 mm', 0, 0);
+    ctx.restore();
+
+    // Design compass indicator block
+    ctx.strokeStyle = '#38bdf8';
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath();
+    ctx.moveTo(1060, 220);
+    ctx.lineTo(1045, 270);
+    ctx.lineTo(1060, 258);
+    ctx.lineTo(1075, 270);
+    ctx.closePath();
+    ctx.fill();
+    ctx.font = 'bold 15px monospace';
+    ctx.fillText('N', 1054, 205);
+    ctx.font = '10px monospace';
+    ctx.fillText('NORDIC GRID', 1025, 285);
+
+    // Professional Drafting Stamp/Title block in the bottom-right corner
+    ctx.strokeStyle = '#0891b2';
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+    ctx.fillRect(720, 510, 270, 120);
+    ctx.strokeRect(720, 510, 270, 120);
+
+    ctx.fillStyle = '#06b6d4';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillText('■ AUTOCAD DWG VECTOR TRANSPILED', 735, 535);
+
+    ctx.fillStyle = '#cbd5e1';
+    ctx.font = '11px sans-serif';
+    ctx.fillText(`도면명: ${baseName}`, 735, 560);
+    ctx.fillText(`축  척: Metric Ratio Scale 1:100`, 735, 578);
+    ctx.fillText(`검사자: ALLCHANGE VECTOR PARSER V4`, 735, 596);
+    ctx.fillStyle = '#22d3ee';
+    ctx.fillText(`원  본: ${originalFileName}`, 735, 614);
+
+  } else if (type === 'ai') {
+    // Vector illustration theme (warm yellow creative)
+    ctx.fillStyle = '#fffdf5';
+    ctx.fillRect(0, 0, 1200, 842);
+
+    // Illustrator layout guides (fine cyan borders)
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(60, 60, 1080, 722);
+
+    // Artistic abstract vector curves with gradient
+    const grad = ctx.createLinearGradient(0, 0, 1200, 842);
+    grad.addColorStop(0, '#f43f5e');
+    grad.addColorStop(0.3, '#ec4899');
+    grad.addColorStop(0.6, '#a855f7');
+    grad.addColorStop(1, '#3b82f6');
+
+    // Drawing geometric vector shapes
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 12;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(150, 600);
+    ctx.bezierCurveTo(400, 100, 800, 750, 1050, 200);
+    ctx.stroke();
+
+    // Vector anchor points helper illustration
+    ctx.fillStyle = '#3b82f6';
+    const drawAnchor = (x: number, y: number) => {
+      ctx.fillRect(x - 5, y - 5, 10, 10);
+      ctx.strokeRect(x - 5, y - 5, 10, 10);
+    };
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    drawAnchor(150, 600);
+    drawAnchor(1050, 200);
+
+    // Additional geometric overlapping shapes (polygons etc.)
+    ctx.fillStyle = 'rgba(168, 85, 247, 0.15)';
+    ctx.strokeStyle = '#a855f7';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(600, 420, 120, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(236, 72, 153, 0.1)';
+    ctx.strokeStyle = '#ec4899';
+    ctx.beginPath();
+    ctx.moveTo(600, 300);
+    ctx.lineTo(750, 560);
+    ctx.lineTo(450, 560);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Metadata labels
+    ctx.fillStyle = '#1e293b';
+    ctx.font = 'bold 22px "Inter", sans-serif';
+    ctx.fillText('Adobe Illustrator Vector Artboard', 100, 130);
+    ctx.font = '14px sans-serif';
+    ctx.fillStyle = '#64748b';
+    ctx.fillText(`작품 원본명: ${originalFileName}`, 100, 160);
+    ctx.fillText(`해상도 모듈: 무한 가변 고해상도 벡터 패스 인코딩`, 100, 182);
+    ctx.fillText(`엔진 식별자: AI_PARSER_V2.146`, 100, 204);
+
+    // Footer info
+    ctx.font = 'bold 11px monospace';
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText('ALLCHANGE CO., LTD. ALL VECTOR LAYERS PRESERVED.', 100, 750);
+
+  } else if (type === 'psd') {
+    // Photoshop dark-theme layout with layered bars
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(0, 0, 1200, 842);
+
+    // File grid borders
+    ctx.fillStyle = '#475569';
+    const boxSize = 20;
+    for (let x = 60; x < 1140; x += boxSize * 2) {
+      for (let y = 60; y < 780; y += boxSize * 2) {
+        ctx.fillRect(x, y, boxSize, boxSize);
+        ctx.fillRect(x + boxSize, y + boxSize, boxSize, boxSize);
+      }
+    }
+
+    // Centered Canvas layout
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+    ctx.fillRect(160, 120, 880, 580);
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(160, 120, 880, 580);
+
+    // Simulated design text
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 32px sans-serif';
+    ctx.fillText('PHOTOSHOP HIGH RESOLUTION LAYER', 220, 260);
+
+    ctx.font = 'bold 15px monospace';
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillText(`[레이어 인덱스 맵 - 활성 상태]`, 220, 310);
+
+    ctx.font = '13px sans-serif';
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText(`• Layer 0 (스마트 오브젝트): ${baseName}`, 220, 345);
+    ctx.fillText(`• Layer 1 (마스크 및 어포선): RGBA TrueColor 투명 배경`, 220, 375);
+    ctx.fillText(`• Layer 2 (필터 가스 조율): Gaussian Blur / Vector Path Overlay`, 220, 405);
+    ctx.fillText(`• Layer 3 (안전 워터마크): 검증 암호화 서명 포함`, 220, 435);
+
+    // Highlight border corners
+    ctx.strokeStyle = '#60a5fa';
+    ctx.lineWidth = 4;
+    // Top-Left
+    ctx.beginPath(); ctx.moveTo(150, 130); ctx.lineTo(150, 110); ctx.lineTo(170, 110); ctx.stroke();
+    // Top-Right
+    ctx.beginPath(); ctx.moveTo(1050, 130); ctx.lineTo(1050, 110); ctx.lineTo(1030, 110); ctx.stroke();
+    // Bottom-Left
+    ctx.beginPath(); ctx.moveTo(150, 690); ctx.lineTo(150, 710); ctx.lineTo(170, 710); ctx.stroke();
+    // Bottom-Right
+    ctx.beginPath(); ctx.moveTo(1050, 690); ctx.lineTo(1050, 710); ctx.lineTo(1030, 710); ctx.stroke();
+
+    // Extra Tag info
+    ctx.font = '11px sans-serif';
+    ctx.fillStyle = '#3b82f6';
+    ctx.fillText(`PSD 원본 매크로: ${originalFileName}`, 220, 500);
+  }
+
+  return canvas.toDataURL('image/png');
+}
+
 // Generate realistic download file payloads based on selected format
 export async function generateConvertedFile(
   originalFileName: string,
@@ -170,12 +445,28 @@ export async function generateConvertedFile(
     case 'jpg':
     case 'jpeg':
       mimeType = 'image/jpeg';
-      fileContent = sourceDataUrl || 'FakeJPEGContent';
+      if (originalFileName.toLowerCase().endsWith('.dwg')) {
+        fileContent = generateCadMockup(originalFileName, 'dwg');
+      } else if (originalFileName.toLowerCase().endsWith('.ai')) {
+        fileContent = generateCadMockup(originalFileName, 'ai');
+      } else if (originalFileName.toLowerCase().endsWith('.psd')) {
+        fileContent = generateCadMockup(originalFileName, 'psd');
+      } else {
+        fileContent = sourceDataUrl || 'FakeJPEGContent';
+      }
       break;
 
     case 'png':
       mimeType = 'image/png';
-      fileContent = sourceDataUrl || 'FakePNGContent';
+      if (originalFileName.toLowerCase().endsWith('.dwg')) {
+        fileContent = generateCadMockup(originalFileName, 'dwg');
+      } else if (originalFileName.toLowerCase().endsWith('.ai')) {
+        fileContent = generateCadMockup(originalFileName, 'ai');
+      } else if (originalFileName.toLowerCase().endsWith('.psd')) {
+        fileContent = generateCadMockup(originalFileName, 'psd');
+      } else {
+        fileContent = sourceDataUrl || 'FakePNGContent';
+      }
       break;
   }
 
