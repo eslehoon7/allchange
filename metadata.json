@@ -1,0 +1,6 @@
+{
+  "name": "allchange",
+  "description": "다양한 파일 형식(PDF, JPG, PNG, HWP, DOCX, PPTX, TXT, DWG, XLSX, AI, PSD 등)을 초고속으로 빠르고 정확하게 상호 변환해주는 스마트 포맷 컨버터 서비스",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
