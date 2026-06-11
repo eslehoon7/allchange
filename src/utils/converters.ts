@@ -61,16 +61,43 @@ export function formatBytes(bytes: number, decimals = 2) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
-// pptxgenjs를 CDN에서 동적 로드
+// pptxgenjs를 CDN에서 동적 로드 (공식 & 다중 백업 CDN 대응)
 async function loadPptxGenJs(): Promise<any> {
-  if ((window as any).PptxGenJS) return (window as any).PptxGenJS;
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundle.js';
-    script.onload = () => resolve((window as any).PptxGenJS);
-    script.onerror = () => reject(new Error('pptxgenjs 로드 실패'));
-    document.head.appendChild(script);
-  });
+  const getGlobal = () => (window as any).PptxGenJS || (window as any).PptxGen || (window as any).pptxgen;
+  const existing = getGlobal();
+  if (existing) return existing;
+
+  const urls = [
+    'https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js',
+    'https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs/dist/pptxgen.bundle.js',
+    'https://unpkg.com/pptxgenjs@3.12.0/dist/pptxgen.bundle.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundle.js'
+  ];
+
+  for (const url of urls) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = url;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('Load failed'));
+        document.head.appendChild(script);
+      });
+      const ctor = getGlobal();
+      if (ctor) return ctor;
+    } catch (e) {
+      console.warn(`Failed to load pptxgenjs from ${url}:`, e);
+    }
+  }
+
+  // 전역 윈도우 객체 전수 조사 (pptx 문자열 포함 필터링)
+  const keys = Object.keys(window).filter(k => k.toLowerCase().includes('pptx'));
+  if (keys.length > 0) {
+    console.log('Found potential pptxgenjs globals:', keys);
+    return (window as any)[keys[0]];
+  }
+
+  throw new Error('pptxgenjs CDN 로드 모두 실패 및 전역 객체를 찾을 수 없습니다.');
 }
 
 // PDF → PPTX 실제 변환
@@ -91,21 +118,35 @@ async function convertPdfToPptx(
   const pdfDoc = await pdfjsLib.getDocument({ data: uint8 }).promise;
   const totalPages = pdfDoc.numPages;
 
-  const pptx = new PptxGenJS();
+  // ── 첫 페이지 기준으로 슬라이드 크기 1회만 정의
+  const firstPage = await pdfDoc.getPage(1);
+  const firstViewport = firstPage.getViewport({ scale: 1.0 });
+  const INCH = 96;
+  const slideW = Math.round((firstViewport.width / INCH) * 100) / 100;
+  const slideH = Math.round((firstViewport.height / INCH) * 100) / 100;
+
+  // 안전한 생성자 인스턴스화 대응
+  let pptx: any;
+  if (typeof PptxGenJS === 'function') {
+    pptx = new PptxGenJS();
+  } else if (PptxGenJS && typeof PptxGenJS.default === 'function') {
+    pptx = new PptxGenJS.default();
+  } else {
+    try {
+      pptx = new PptxGenJS();
+    } catch {
+      pptx = PptxGenJS;
+    }
+  }
+
+  pptx.defineLayout({ name: 'PDF_LAYOUT', width: slideW, height: slideH });
+  pptx.layout = 'PDF_LAYOUT';
 
   for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
     const page = await pdfDoc.getPage(pageNum);
     const viewport = page.getViewport({ scale: 1.0 });
 
-    // 슬라이드 크기를 PDF 페이지 비율에 맞춤 (인치 단위)
-    const INCH = 96; // 1인치 = 96px 기준
-    const slideW = viewport.width / INCH;
-    const slideH = viewport.height / INCH;
-    pptx.defineLayout({ name: `L${pageNum}`, width: slideW, height: slideH });
-
-    const slide = pptx.addSlide();
-
-    // ── 1. 페이지 전체를 고해상도 이미지로 렌더링 (배경으로 삽입)
+    // ── 1. 고해상도 배경 이미지 렌더링
     const bgCanvas = document.createElement('canvas');
     const scale = 2.0;
     const bgViewport = page.getViewport({ scale });
@@ -115,56 +156,64 @@ async function convertPdfToPptx(
     bgCtx.fillStyle = '#ffffff';
     bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
     await page.render({ canvasContext: bgCtx, viewport: bgViewport }).promise;
-    const bgDataUrl = bgCanvas.toDataURL('image/png');
+    const bgDataUrl = bgCanvas.toDataURL('image/jpeg', 0.92); // JPEG로 용량 절감
 
-    // 배경 이미지 슬라이드 전체에 깔기
+    // ── 슬라이드 추가 (레이아웃 명시)
+    const slide = pptx.addSlide({ masterName: 'PDF_LAYOUT' });
+
+    // 배경 이미지 전체 삽입
     slide.addImage({
       data: bgDataUrl,
       x: 0, y: 0,
       w: slideW, h: slideH,
     });
 
-    // ── 2. 텍스트 콘텐츠 추출 → 투명 텍스트박스로 위에 올리기 (검색/복사 가능)
-    const textContent = await page.getTextContent();
-    const items = textContent.items as any[];
+    // ── 2. 텍스트 레이어 (투명 - 복사/검색용)
+    try {
+      const textContent = await page.getTextContent();
+      const items = textContent.items as any[];
 
-    for (const item of items) {
-      if (!item.str || item.str.trim() === '') continue;
+      for (const item of items) {
+        if (!item.str || item.str.trim() === '') continue;
 
-      // PDF 좌표 → 슬라이드 좌표 변환
-      // PDF는 좌하단 원점, PPTX는 좌상단 원점
-      const tx = item.transform[4]; // x
-      const ty = item.transform[5]; // y
-      const fontSize = Math.abs(item.transform[3]); // 폰트 크기(pt)
+        const tx = item.transform[4];
+        const ty = item.transform[5];
+        const fontSize = Math.abs(item.transform[3]);
+        if (fontSize < 1) continue;
 
-      const x = tx / viewport.width * slideW;
-      const y = (viewport.height - ty - fontSize) / viewport.height * slideH;
-      const w = (item.width || fontSize * item.str.length * 0.6) / viewport.width * slideW;
-      const h = (fontSize * 1.4) / viewport.height * slideH;
+        const x = (tx / viewport.width) * slideW;
+        const y = ((viewport.height - ty - fontSize) / viewport.height) * slideH;
+        const w = Math.max(0.1, ((item.width || fontSize * item.str.length * 0.55) / viewport.width) * slideW);
+        const h = Math.max(0.1, ((fontSize * 1.5) / viewport.height) * slideH);
 
-      // 범위 벗어나는 요소 스킵
-      if (x < 0 || y < 0 || x > slideW || y > slideH) continue;
+        if (x < 0 || y < 0 || x + w > slideW + 0.5 || y + h > slideH + 0.5) continue;
 
-      slide.addText(item.str, {
-        x: Math.max(0, x),
-        y: Math.max(0, y),
-        w: Math.max(0.1, w),
-        h: Math.max(0.1, h),
-        fontSize: Math.max(6, Math.round(fontSize * 0.75)), // pt → pptx pt
-        color: '000000',
-        transparency: 100, // 완전 투명 (배경 이미지 위에 올라가는 텍스트레이어)
-        fontFace: 'Malgun Gothic', // 한글 폰트
-        wrap: false,
-      });
+        slide.addText(item.str, {
+          x: Math.max(0, x),
+          y: Math.max(0, y),
+          w,
+          h,
+          fontSize: Math.max(6, Math.round(fontSize * 0.75)),
+          color: 'FFFFFF',
+          transparency: 100,
+          fontFace: 'Arial',
+          wrap: false,
+          isTextBox: true,
+        });
+      }
+    } catch (_) {
+      // 텍스트 추출 실패해도 이미지 슬라이드는 정상 유지
     }
   }
 
-  // PPTX Blob 생성
-  const pptxBlob = await pptx.write({ outputType: 'blob' }) as Blob;
+  // PPTX Blob 생성 (pptxgenjs v3 브라우저 방식)
+  const pptxArrayBuffer = await pptx.write('arraybuffer') as ArrayBuffer;
+  const pptxBlob = new Blob([pptxArrayBuffer], {
+    type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+  });
   const fileName = `${baseName}.pptx`;
 
   // 미리보기: 첫 페이지 PNG
-  const firstPage = await pdfDoc.getPage(1);
   const previewViewport = firstPage.getViewport({ scale: 1.5 });
   const previewCanvas = document.createElement('canvas');
   previewCanvas.width = previewViewport.width;
@@ -331,7 +380,8 @@ export async function generateConvertedFile(
   originalFileName: string,
   targetFormat: FileFormat,
   sourceDataUrl?: string,
-  rawContent?: string
+  rawContent?: string,
+  conversionIndex?: number
 ): Promise<{ blob: Blob; fileName: string; previewUrl: string }> {
   const dotIndex = originalFileName.lastIndexOf('.');
   const baseName = dotIndex !== -1 ? originalFileName.substring(0, dotIndex) : originalFileName;
